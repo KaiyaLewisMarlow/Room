@@ -7,32 +7,14 @@
 
 
 global_settings {
-  /*photons {
-    spacing 0.01                 // specify the density of photons
-    count 100000               // alternatively use a total number of photons
-
-    //gather min, max            // amount of photons gathered during render [20, 100]
-    //media max_steps [,factor]  // media photons
-    //jitter 1.0                 // jitter phor photon rays
-    //max_trace_level 5          // optional separate max_trace_level
-    //adc_bailout 1/255          // see global adc_bailout
-    //save_file "filename"       // save photons to file
-    //load_file "filename"       // load photons from file
-    //autostop 0                 // photon autostop option
-    //radius 10                  // manually specified search radius
-    // (---Adaptive Search Radius---)
-    //steps 1
-    //expand_thresholds 0.2, 40
-    media 100
-  }*/
-
+ 
   radiosity {
     pretrace_start 0.08           // start pretrace at this size
     pretrace_end   0.04           // end pretrace at this size
     count 100                // higher -> higher quality (1..1600) [35]
 
     nearest_count 5              // higher -> higher quality (1..10) [5]
-    error_bound 3               // higher -> smoother, less accurate [1.8]
+    error_bound 1.8               // higher -> smoother, less accurate [1.8]
     recursion_limit 3             // how much interreflections are calculated (1..5+) [3]
 
     low_error_factor .5           // reduce error_bound during last pretrace step
@@ -43,7 +25,7 @@ global_settings {
     adc_bailout 0.01/2
     normal on                   // take surface normals into account [off]
     media on                    // take media into account [off]
-       //max_sample 1.0              // maximum brightness of samples
+  
   }
   
 }
@@ -97,11 +79,32 @@ global_settings {
 #declare DoorWidth=DoorHeight/2;
 #declare DoorToRightWall=30;
 #declare DoorDepth=3;
-#declare DoorCutOut= box {
+#declare DoorOutline= box {
 	<0,0,-DoorDepth>
 	<DoorWidth,DoorHeight,DoorDepth>
-	translate <RoomWidth-DoorToRightWall,0,RoomLength>
+	
 };
+#declare DoorCutOut=box{
+	<3,DoorHeight-3,-DoorDepth-1>
+	<DoorWidth,DoorHeight-DoorHeight*1/2,DoorDepth+1>
+
+}
+
+#declare Door=difference{
+	object{DoorOutline}
+	object{DoorCutOut}
+	
+
+}
+	
+
+object{Door
+	texture{
+		pigment{DarkWoodPigment}
+	}
+	translate <RoomWidth-DoorToRightWall,0,RoomLength>
+}
+
 
 //floor
 #declare Flooring = pigment {
@@ -153,8 +156,45 @@ object{WindowFrame
 		DarkWoodPigment
 	}
 }
+#declare GlassTexture=texture{
+		pigment{
+			rgbf<.7,.9,.7,.8>
+		}
+		finish { irid {.5 thickness .1 turbulence 10}}
+	
 
-#declare Door=box{
+	}
+	texture{
+		normal {waves 10}
+		scale 10
+		pigment{
+			rgbf<1,1,1,.99>
+		}
+		finish{ reflection .4}
+			}
+
+#declare WindowGlass=cylinder{
+	<0,0,0>
+	<0,0,-1>
+	WindowRadius
+	texture {GlassTexture}
+	}
+
+object{WindowGlass
+	translate <WindowDistanceFromCorner,WindowHeightFromFloor,0>
+	}
+
+#declare DoorGlass= box{
+	<3,DoorHeight-3,DoorDepth>
+	<DoorWidth,DoorHeight-DoorHeight*1/2,DoorDepth+.1>
+	texture{GlassTexture}
+}
+
+object{DoorGlass
+	translate <RoomWidth-DoorToRightWall,0,RoomLength>
+}	
+
+	
 	
 
 sky_sphere {
@@ -187,22 +227,33 @@ sky_sphere {
 	
 light_source {
 	<HalfRoomWidth,RoomHeight-10,HalfRoomLength>
-	rgb <1,1,1>*.01
-	photons {reflection off}
-	
+	rgb <1,1,1>*.1
+	media_interaction off
 }
 
 light_source{
 	<-30,100,30>
-	rgb <1,1,.5>*50
+	rgb <1,1,.5>
 	parallel	
-	point_at <HalfRoomWidth,0,HalfRoomLength>
-	
+	point_at <HalfRoomWidth,3,HalfRoomLength>
+	media_interaction on
 }
 
 light_source{
-	<RoomWidth-60,RoomHeight+25,-RoomLength+30>
-	rgb<1,1,0>
+	<RoomWidth-20,RoomHeight+10,RoomLength+50>
+	rgb<1,1,.5>*.2
+	spotlight
+	point_at<RoomWidth-20,0,10>
+	falloff 50
+	tightness 10
+	media_attenuation on
+	}
+	
+	
+	
+light_source{
+	<RoomWidth-40,RoomHeight+30,-RoomLength+20>	
+	rgb<1,1,.7,>*.2
 	spotlight
 	point_at<WindowDistanceFromCorner,WindowHeightFromFloor,0>
 	falloff 10
@@ -211,9 +262,10 @@ light_source{
 }
 
 
+
 //camera bits
 #declare DoorView= camera {
-		location <.1,HalfRoomHeight,.1>
+		location <10,HalfRoomHeight,10>
 		look_at <RoomWidth-.1,HalfRoomHeight*1/8,RoomLength-5>
 	focal_point <RoomWidth-.1,HalfRoomHeight*1/8,RoomLength-5>
 	aperture .4
@@ -228,13 +280,36 @@ light_source{
 
 #declare ShelfCornerView=camera{
 	location<HalfRoomWidth-40,HalfRoomHeight+10,HalfRoomLength-30>
-	//look_at<RoomWidth,HalfRoomHeight,0>
 	look_at<RoomWidth-1,HalfRoomHeight,HalfRoomLength>
 }
 
 #declare BedTimeView=camera{
 	location<HalfRoomWidth+10,HalfRoomHeight+20,HalfRoomLength+15>
 	look_at <0,0,0>
+	focal_point <10,0,10>
+	aperture .5
+	blur_samples 10
+}
+
+
+#declare OutsideWindowView=camera{
+	location <RoomWidth-40,RoomHeight+30,-RoomLength+20>
+	look_at<WindowDistanceFromCorner,WindowHeightFromFloor,0>
+	}
+
+#declare OutsideDoorView=camera{
+	location <RoomWidth-20,RoomHeight+15,RoomLength+60>
+	look_at<RoomWidth-20,0,0>
+	}
+
+#declare PlantView=camera{
+	location<HalfRoomWidth-30,RoomHeight-10,HalfRoomLength-10>
+	look_at<RoomWidth,HalfRoomHeight,0>
+}
+
+#declare TableView=camera{
+	location<HalfRoomWidth,HalfRoomHeight,60>
+	look_at<WindowDistanceFromCorner,20,0>
 }
 
 #declare WindowView=camera{
@@ -243,12 +318,12 @@ light_source{
 	angle 70
 }
 
-#declare OutsideView=camera{
-	location <RoomWidth-60,RoomHeight+10,-RoomLength+30>
-	look_at<WindowDistanceFromCorner,WindowHeightFromFloor,0>
-	}
+#declare BookShelfView=camera{
+	location<10,RoomHeight-1,HalfRoomLength>
+	look_at <RoomWidth, HalfRoomHeight,HalfRoomLength>
+}
 
-camera {WindowView}
+camera {DoorView}
 
 /*needed: 
 	5 camera positions
@@ -266,9 +341,10 @@ difference {
 	object {
 		Room
 	}
-	object {
-		DoorCutOut
-	}
+	object{DoorCutOut
+		translate <RoomWidth-DoorToRightWall,0,RoomLength>
+}
+
 	object {
 		WindowCutOut1
 	}
@@ -291,16 +367,6 @@ box{
 #declare bedlength=50;
 #declare bedheight=20;
 
-//box——————————————————— 
-//#declare bed= box {
-//	<bedwidth,bedheight,bedlength>
-//	<0,0,0>
-//	texture {
-//		pigment{
-//			rgb <0,0,0>
-//		}}}
-//————————————————————
-//bedframe base
 #declare FrameBaseHeight=.5;
 #declare FrameBase=box {
 	<0,0,0>
@@ -389,19 +455,6 @@ object{headboard
 }
 
 //sidetable
-
-//box——————————————————— 
-//#declare sidetableblock= box{
-//	<0,0,0>
-//	<bedwidth,bedheight-5,bedlength*1/2>
-//	texture{
-//		pigment{ 
-//			rgb <1,0,0>
-//		}
-//	}
-//	translate <bedwidth+3,0,0>
-//}	
-//————————————————————
 
 
 #declare tablewidth=25;
@@ -502,7 +555,7 @@ object{Leg
 	translate<0,0,desklength*2/3>
 }	
 object{Leg
-	translate<deskwidth*1/3,0,0>
+	translate<deskwidth*1/3,0,0> 
 }
 object{Leg
 	translate<deskwidth*1/3,0,desklength*2/3>
@@ -654,19 +707,19 @@ object{desk
 	
 object{Shelf
 	rotate<0,90,0>
-	translate <RoomWidth-shelflength,20,shelfwidth>
+	translate <RoomWidth-shelflength,20,shelfwidth+10>
 	
 }
 
 
 object{Shelf
 	rotate <0,90,0>
-	translate<RoomWidth-shelflength,35,shelfwidth+10>
+	translate<RoomWidth-shelflength,35,shelfwidth+20>
 }
 
 object{Shelf
 	rotate<0,90,0>
-	translate<RoomWidth-shelflength,50,shelfwidth+20>
+	translate<RoomWidth-shelflength,50,shelfwidth+30>
 }
 
 
@@ -883,7 +936,7 @@ object{HangingPlant
 
 object{Plant
 	rotate<0,-130,0>
-	translate<86,36,HalfRoomLength+7.5>
+	translate<86,36,HalfRoomLength+17.5>
 }
 
 //BOOK——————————————————————————————————————————————————
@@ -970,7 +1023,7 @@ object{Plant
 	object{Pages}
 	scale <2, 1.2,0>
 	}
-
+#declare BooksOnShelf= union{
 object{Book1
 	rotate<0,90,0>
 	translate<RoomWidth-BookLength*1.5,36,HalfRoomLength-10.5>
@@ -1028,4 +1081,59 @@ object{Book3
 	translate<RoomWidth-BookLength*2,51,HalfRoomLength-10>
 	texture{BindingPigment2}
 }
+}
+
+object{BooksOnShelf
+	translate <0,0,10>}
+
+object{Book2
+	rotate <0,0,90>
+	rotate<0,45,0>
+	texture{BindingPigment3}
+	translate <50,TableHeight*2+3.6,5>
+}
+
+//Cup——————————————————————————————————————————————————
+
+#declare Cup = lathe{
+		quadratic_spline
+			11,
+		<0,0>, <.5,.5>, <1,2>,<1.1,2>,<.6,.5>,<.3,0>,<.2,-.5>	,<.1,-.7>,<.2,-1>,<.6,-1.3>,<.6,-1.5>		texture{GlassTexture}
+		texture{
+			
+			finish{reflection .5 phong 10}
+		}
+}
+			
+		
+object{Cup
+	scale 2
+	translate <HalfRoomWidth-8,TableHeight*2+7,6>}
+
+	
+	
+//DustMotes——————————————————————————————————————————————
+
+#declare Dust=box{
+	//<RoomWidth-.1,RoomHeight-.1,RoomLength-.1>
+	//<.1,.1,.1>
+	<0.1,0.1,0.1>
+	<1,1,1>
+	texture{pigment{rgbt 1}}
+	hollow 
+	interior{
+		media{
+			scattering {2, 0.02 extinction .1}
+			samples 30,100}
+	}
+}
+	
+object{Dust
+	scale 101
+	translate<0,-1,0>
+	}
+	
+
+
+
 
